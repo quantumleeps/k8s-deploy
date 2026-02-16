@@ -1,0 +1,44 @@
+replicaCount: 2
+
+image:
+  repository: rag-pipeline
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 15
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+env:
+  MOCK_MODE: "false"
+
+# Sensitive values — override via --set or external secrets
+secrets:
+  VOYAGE_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  POSTGRES_PASSWORD: ""
+
+# Database connection (non-sensitive)
+database:
+  host: "localhost"
+  port: "5432"
+  name: "rag_pipeline"
+  user: "rag"

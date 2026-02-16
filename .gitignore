@@ -11,6 +11,7 @@ service-account*.json
 *secret*
 !*secret*.py
 !*secret*.ts
+!*secret*.yaml
 
 # === Python ===
 __pycache__/
