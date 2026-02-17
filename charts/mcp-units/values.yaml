@@ -1,0 +1,26 @@
+replicaCount: 1
+
+image:
+  repository: mcp-units
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+
+probes:
+  liveness:
+    initialDelaySeconds: 5
+    periodSeconds: 15
+  readiness:
+    initialDelaySeconds: 3
+    periodSeconds: 10

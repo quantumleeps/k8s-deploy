@@ -1,0 +1,7 @@
+apiVersion: v2
+name: mcp-units
+description: MCP server for unit conversions
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+icon: https://raw.githubusercontent.com/quantumleeps/k8s-deploy/main/icon.png
