@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "rag-pipeline.labels" . | nindent 4 }}
 spec:
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "rag-pipeline.selectorLabels" . | nindent 6 }}
