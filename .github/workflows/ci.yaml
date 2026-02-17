@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-helm:
+    name: Lint Helm charts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+      - name: Lint rag-pipeline chart
+        run: helm lint charts/rag-pipeline
+      - name: Lint rag-pipeline with local values
+        run: helm lint charts/rag-pipeline -f charts/rag-pipeline/values-local.yaml
+      - name: Lint rag-pipeline with EKS values
+        run: helm lint charts/rag-pipeline -f charts/rag-pipeline/values-eks.yaml
+      - name: Lint mcp-units chart
+        run: helm lint charts/mcp-units
+
+  lint-terraform:
+    name: Lint Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Format check
+        run: terraform -chdir=terraform fmt -check
+      - name: Init
+        run: terraform -chdir=terraform init -backend=false
+      - name: Validate
+        run: terraform -chdir=terraform validate
+
+  integration:
+    name: Deploy to kind
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: k8s-deploy
+
+      - name: Checkout rag-pipeline
+        uses: actions/checkout@v4
+        with:
+          repository: quantumleeps/rag-pipeline
+          path: rag-pipeline
+
+      - name: Checkout mcp-units
+        uses: actions/checkout@v4
+        with:
+          repository: quantumleeps/mcp-units
+          path: mcp-units
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: k8s-deploy/kind/cluster.yaml
+
+      - name: Install NGINX ingress
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=120s
+
+      - name: Build and load images
+        run: |
+          docker build -t rag-pipeline:ci rag-pipeline/
+          kind load docker-image rag-pipeline:ci
+
+          docker build -t mcp-units:ci mcp-units/
+          kind load docker-image mcp-units:ci
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy charts
+        run: |
+          helm install rag k8s-deploy/charts/rag-pipeline \
+            -f k8s-deploy/charts/rag-pipeline/values-local.yaml \
+            --set image.tag=ci \
+            --set env.MOCK_MODE=true \
+            --set secrets.POSTGRES_PASSWORD=ci-test
+
+          helm install mcp k8s-deploy/charts/mcp-units \
+            --set image.tag=ci
+
+      - name: Wait for pods
+        run: |
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=rag-pipeline \
+            --timeout=120s
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=mcp-units \
+            --timeout=120s
+
+      - name: Smoke test
+        run: |
+          kubectl port-forward svc/rag-rag-pipeline 8080:8000 &
+          sleep 5
+          curl -f http://localhost:8080/health
+          curl -f -X POST http://localhost:8080/query \
+            -H "Content-Type: application/json" \
+            -d '{"question":"test"}'
