@@ -11,6 +11,10 @@ kind create cluster --name "$CLUSTER_NAME" --config "$SCRIPT_DIR/cluster.yaml"
 
 echo "==> Installing NGINX ingress controller..."
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+# Ensure controller schedules on control-plane node (has extraPortMappings)
+kubectl patch deployment ingress-nginx-controller -n ingress-nginx \
+  --type='json' \
+  -p='[{"op": "add", "path": "/spec/template/spec/nodeSelector/ingress-ready", "value": "true"}]'
 echo "    Waiting for ingress controller to be ready..."
 kubectl wait --namespace ingress-nginx \
   --for=condition=ready pod \
