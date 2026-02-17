@@ -1,0 +1,112 @@
+name: Deploy to EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (defaults to git SHA)"
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: leeper-ai
+
+jobs:
+  build-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: k8s-deploy
+
+      - name: Checkout rag-pipeline
+        uses: actions/checkout@v4
+        with:
+          repository: quantumleeps/rag-pipeline
+          path: rag-pipeline
+
+      - name: Checkout mcp-units
+        uses: actions/checkout@v4
+        with:
+          repository: quantumleeps/mcp-units
+          path: mcp-units
+
+      - name: Set image tag
+        id: tag
+        run: echo "tag=${{ inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push rag-pipeline
+        run: |
+          docker build -t ${{ steps.ecr.outputs.registry }}/rag-pipeline:${{ steps.tag.outputs.tag }} rag-pipeline/
+          docker push ${{ steps.ecr.outputs.registry }}/rag-pipeline:${{ steps.tag.outputs.tag }}
+
+      - name: Build and push mcp-units
+        run: |
+          docker build -t ${{ steps.ecr.outputs.registry }}/mcp-units:${{ steps.tag.outputs.tag }} mcp-units/
+          docker push ${{ steps.ecr.outputs.registry }}/mcp-units:${{ steps.tag.outputs.tag }}
+
+  deploy:
+    name: Deploy to EKS
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy rag-pipeline
+        run: |
+          helm upgrade --install rag charts/rag-pipeline \
+            -f charts/rag-pipeline/values-eks.yaml \
+            --set image.repository=${{ steps.ecr.outputs.registry }}/rag-pipeline \
+            --set image.tag=${{ needs.build-push.outputs.image_tag }} \
+            --set secrets.VOYAGE_API_KEY=${{ secrets.VOYAGE_API_KEY }} \
+            --set secrets.ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
+            --set database.host=${{ secrets.NEON_HOST }} \
+            --set secrets.POSTGRES_PASSWORD=${{ secrets.NEON_PASSWORD }}
+
+      - name: Deploy mcp-units
+        run: |
+          helm upgrade --install mcp charts/mcp-units \
+            --set image.repository=${{ steps.ecr.outputs.registry }}/mcp-units \
+            --set image.tag=${{ needs.build-push.outputs.image_tag }}
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/rag-rag-pipeline --timeout=120s
+          kubectl rollout status deployment/mcp-mcp-units --timeout=120s
+          kubectl get pods
+          kubectl get ingress
