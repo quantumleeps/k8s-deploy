@@ -38,7 +38,26 @@ secrets:
 
 # Database connection (non-sensitive)
 database:
+  mode: external  # "internal" for pgvector StatefulSet, "external" for Neon/RDS
   host: "localhost"
   port: "5432"
   name: "rag_pipeline"
   user: "rag"
+  internal:
+    image: pgvector/pgvector:pg17
+    storage: 1Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: rag.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70

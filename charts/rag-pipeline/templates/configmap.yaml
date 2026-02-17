@@ -5,7 +5,11 @@ metadata:
   labels:
     {{- include "rag-pipeline.labels" . | nindent 4 }}
 data:
+  {{- if eq .Values.database.mode "internal" }}
+  POSTGRES_HOST: {{ include "rag-pipeline.fullname" . }}-pgvector
+  {{- else }}
   POSTGRES_HOST: {{ .Values.database.host | quote }}
+  {{- end }}
   POSTGRES_PORT: {{ .Values.database.port | quote }}
   POSTGRES_DB: {{ .Values.database.name | quote }}
   POSTGRES_USER: {{ .Values.database.user | quote }}

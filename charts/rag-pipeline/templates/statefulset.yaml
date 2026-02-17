@@ -1,0 +1,80 @@
+{{- if eq .Values.database.mode "internal" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "rag-pipeline.fullname" . }}-pgvector
+  labels:
+    {{- include "rag-pipeline.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  serviceName: {{ include "rag-pipeline.fullname" . }}-pgvector
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "rag-pipeline.name" . }}-pgvector
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "rag-pipeline.name" . }}-pgvector
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: pgvector
+          image: {{ .Values.database.internal.image }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.database.name | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.database.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rag-pipeline.fullname" . }}
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.database.user | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.database.internal.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rag-pipeline.fullname" . }}-pgvector
+  labels:
+    {{- include "rag-pipeline.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    app.kubernetes.io/name: {{ include "rag-pipeline.name" . }}-pgvector
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
