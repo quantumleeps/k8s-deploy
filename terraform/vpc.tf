@@ -10,8 +10,9 @@ module "vpc" {
 
   # No private subnets or NAT gateway — cost optimization for demo.
   # Production would use private subnets + NAT for worker nodes.
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+  map_public_ip_on_launch = true
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
 
   public_subnet_tags = {
     "kubernetes.io/role/elb" = 1

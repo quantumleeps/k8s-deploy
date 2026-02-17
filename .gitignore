@@ -36,6 +36,8 @@ node_modules/
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfplan
+tfplan
 *.tfvars
 !*.tfvars.example
 
