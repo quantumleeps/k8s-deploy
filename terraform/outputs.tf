@@ -22,3 +22,8 @@ output "ecr_mcp_units_url" {
   description = "ECR repository URL for mcp-units"
   value       = aws_ecr_repository.mcp_units.repository_url
 }
+
+output "github_actions_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC"
+  value       = aws_iam_role.github_actions.arn
+}
