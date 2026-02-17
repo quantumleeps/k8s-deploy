@@ -1,0 +1,29 @@
+# kind cluster overrides
+
+image:
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "250m"
+
+database:
+  mode: internal
+  internal:
+    storage: 512Mi
+
+ingress:
+  className: nginx
+  hosts:
+    - host: rag.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 3
