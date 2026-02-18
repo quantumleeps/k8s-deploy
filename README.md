@@ -34,23 +34,23 @@ graph TB
 
 Both services running on EKS with HPA autoscaling:
 
-![Pods and services on EKS](PLACEHOLDER_PODS_URL)
+<img width="1215" height="343" alt="kubectl output showing both pods running, services with LoadBalancer endpoints, and HPA configured for rag-pipeline" src="https://github.com/user-attachments/assets/5fb50325-3a4e-413e-95ad-0b209385383c" />
 
 RAG query answering EPA water treatment questions (EKS pod → Voyage AI → Neon pgvector → Claude):
 
-![RAG query response on EKS](PLACEHOLDER_RAG_URL)
+<img width="1061" height="777" alt="curl response showing RAG query answer about bromate MCL with source chunks and similarity scores" src="https://github.com/user-attachments/assets/a1c1b410-0082-408e-9159-32895855d93b" />
 
 942 indexed document chunks in Neon managed pgvector:
 
-![Neon database dashboard](PLACEHOLDER_NEON_URL)
+<img width="1437" height="884" alt="Neon database dashboard showing rag_pipeline database with pgvector tables and 942 rows" src="https://github.com/user-attachments/assets/2887ce0d-b61f-432c-9faa-bce7fe5a211f" />
 
 HPA scaling replicas during Locust load test on kind:
 
-![HPA autoscaling under load](PLACEHOLDER_HPA_URL)
+<img width="792" height="652" alt="Terminal showing HPA scaling replicas from 1 to 3 during Locust load test" src="https://github.com/user-attachments/assets/9ae4469e-419c-41ae-991e-4977481de8ef" />
 
 MCP units server accessed from Claude Desktop via ngrok tunnel:
 
-PLACEHOLDER_VIDEO_URL
+https://github.com/user-attachments/assets/179e4e38-c2a1-46e4-a73a-d8c7067eb21f
 
 ## How it works
 
