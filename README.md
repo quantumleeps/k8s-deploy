@@ -1,13 +1,13 @@
 # k8s-deploy
 
-Kubernetes deployment for a RAG pipeline and MCP server on EKS, with Helm charts, Terraform infrastructure, HPA autoscaling, and GitHub Actions CI/CD.
+Deploys a RAG pipeline and MCP server to Kubernetes — same Helm charts run locally on kind and in production on EKS.
 
 ## What this does
 
 Deploys two services to Kubernetes:
 
-- **rag-pipeline** — FastAPI service for querying EPA water treatment regulations via RAG (pgvector + LlamaIndex + Voyage AI embeddings). Full Helm chart with HPA, Ingress, ConfigMap/Secret separation, and optional pgvector StatefulSet.
-- **mcp-units** — MCP server for unit conversions. Simple Deployment + Service.
+- **[rag-pipeline](https://github.com/quantumleeps/rag-pipeline)** — FastAPI service for querying EPA water treatment regulations via RAG (pgvector + LlamaIndex + Voyage AI embeddings). Full Helm chart with HPA, Ingress, ConfigMap/Secret separation, and optional pgvector StatefulSet.
+- **[mcp-units](https://github.com/quantumleeps/mcp-units)** — MCP server for unit conversions. Simple Deployment + Service.
 
 Both run locally on kind and in production on EKS — the same Helm charts with different values overrides handle environment promotion. Terraform provisions the AWS infrastructure. GitHub Actions handles CI (lint + kind integration test) and CD (manual deploy to EKS).
 
@@ -16,7 +16,7 @@ Both run locally on kind and in production on EKS — the same Helm charts with 
 ```mermaid
 graph TB
     subgraph EKS Cluster
-        ingress[ALB Ingress] --> rag_svc[rag-pipeline Service]
+        ingress[Ingress] --> rag_svc[rag-pipeline Service]
         ingress --> mcp_svc[mcp-units Service]
         rag_svc --> rag1[rag-pipeline Pod]
         rag_svc --> rag2[rag-pipeline Pod]
@@ -29,6 +29,28 @@ graph TB
     rag1 --> voyage[Voyage AI API]
     rag1 --> anthropic[Anthropic API]
 ```
+
+## Demo
+
+Both services running on EKS with HPA autoscaling:
+
+![Pods and services on EKS](PLACEHOLDER_PODS_URL)
+
+RAG query answering EPA water treatment questions (EKS pod → Voyage AI → Neon pgvector → Claude):
+
+![RAG query response on EKS](PLACEHOLDER_RAG_URL)
+
+942 indexed document chunks in Neon managed pgvector:
+
+![Neon database dashboard](PLACEHOLDER_NEON_URL)
+
+HPA scaling replicas during Locust load test on kind:
+
+![HPA autoscaling under load](PLACEHOLDER_HPA_URL)
+
+MCP units server accessed from Claude Desktop via ngrok tunnel:
+
+PLACEHOLDER_VIDEO_URL
 
 ## How it works
 
@@ -73,20 +95,29 @@ terraform init && terraform apply
 # Configure kubectl
 $(terraform output -raw configure_kubectl)
 
-# Push images to ECR
-ECR=$(terraform output -raw ecr_rag_pipeline_url)
-aws ecr get-login-password | docker login --username AWS --password-stdin "${ECR%/*}"
-docker push "$ECR:latest"
+# Build and push images to ECR
+RAG_ECR=$(terraform output -raw ecr_rag_pipeline_url)
+MCP_ECR=$(terraform output -raw ecr_mcp_units_url)
+aws ecr get-login-password | docker login --username AWS --password-stdin "${RAG_ECR%/*}"
 
-# Deploy
+docker build -t "$RAG_ECR:latest" /path/to/rag-pipeline
+docker push "$RAG_ECR:latest"
+
+docker build -t "$MCP_ECR:latest" /path/to/mcp-units
+docker push "$MCP_ECR:latest"
+
+# Deploy both services
 cd ..
 helm install rag charts/rag-pipeline \
   -f charts/rag-pipeline/values-eks.yaml \
-  --set image.repository="$ECR" \
+  --set image.repository="$RAG_ECR" \
   --set database.host="$NEON_HOST" \
   --set secrets.POSTGRES_PASSWORD="$NEON_PASSWORD" \
   --set secrets.VOYAGE_API_KEY="$VOYAGE_API_KEY" \
   --set secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+
+helm install mcp charts/mcp-units \
+  --set image.repository="$MCP_ECR"
 
 # Tear down when done
 cd terraform && terraform destroy
@@ -113,7 +144,7 @@ k8s-deploy/
     └── deploy.yaml         Manual deploy to EKS
 ```
 
-## Roadmap
+## Next steps
 
 - **Service mesh** (Linkerd) — mTLS between services, traffic splitting, per-route observability
 - **GitOps** (ArgoCD) — declarative deployments from git, automatic drift detection and reconciliation
@@ -121,6 +152,10 @@ k8s-deploy/
 - **Network policies** (Cilium) — restrict pod-to-pod traffic to only what's needed
 - **Observability stack** (Prometheus + Grafana) — cluster and application metrics, dashboards, alerting
 - **Progressive delivery** (Argo Rollouts) — canary deployments with automated rollback
+
+## Contributing
+
+PRs welcome. Run `pre-commit install` after cloning and ensure `helm lint charts/*` passes before submitting.
 
 ## License
 
