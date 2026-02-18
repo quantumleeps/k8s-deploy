@@ -18,7 +18,8 @@ database:
   host: ""
   port: "5432"
   name: "rag_pipeline"
-  user: "rag"
+  user: "neondb_owner"
+  sslmode: "require"
 
 ingress:
   className: alb

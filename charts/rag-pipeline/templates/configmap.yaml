@@ -13,4 +13,5 @@ data:
   POSTGRES_PORT: {{ .Values.database.port | quote }}
   POSTGRES_DB: {{ .Values.database.name | quote }}
   POSTGRES_USER: {{ .Values.database.user | quote }}
+  PGSSLMODE: {{ .Values.database.sslmode | default "" | quote }}
   MOCK_MODE: {{ .Values.env.MOCK_MODE | quote }}
